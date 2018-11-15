@@ -1,8 +1,11 @@
 languageCode = "en-us"
-title = "Snoom"
-baseurl = "https://snoom.co.uk/"
+title = "Snoom Security"
+baseurl = "/"
 theme = "basics"
 
 [params]
 	author = "Snoom"
 	github = "thesnoom"
+	description = "Security and all that malarkey..."
+	authorlocation = "Hmm."
+	paginatedsections = ["posts"]
