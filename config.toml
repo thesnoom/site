@@ -8,4 +8,3 @@ theme = "basics"
 	github = "thesnoom"
 	description = "Security and all that malarkey..."
 	authorlocation = "Hmm."
-	paginatedsections = ["posts"]
