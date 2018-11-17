@@ -2,6 +2,8 @@ languageCode = "en-us"
 title = "Snoom Security"
 baseurl = "/"
 theme = "basics"
+PygmentsCodeFences = true
+pygmentsStyle = ["solarized-dark"]
 
 [params]
 	author = "Snoom"
